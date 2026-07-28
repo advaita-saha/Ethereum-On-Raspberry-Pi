@@ -3,7 +3,7 @@
 # Web3 Pi - rc.local
 #
 
-BRANCH="main"
+BRANCH="add-Nimbus"
 
 # Function: echolog
 # Description: Logs messages with a timestamp prefix. If no arguments are provided,
@@ -141,7 +141,7 @@ if [ "$(get_install_stage)" -eq 0 ]; then
   echo "deb [signed-by=/etc/apt/keyrings/web3-pi-apt-repo.gpg] https://apt.web3pi.io noble main restricted universe multiverse" | tee /etc/apt/sources.list.d/web3-pi.list
   
   set_status "[rc.local] - Update Ethereum-On-Raspberry-Pi repository (--branch ${BRANCH})"
-  git-force-clone --branch ${BRANCH} https://github.com/Web3-Pi/Ethereum-On-Raspberry-Pi.git /opt/web3pi/Ethereum-On-Raspberry-Pi
+  git-force-clone --branch ${BRANCH} https://github.com/advaita-saha/Ethereum-On-Raspberry-Pi.git /opt/web3pi/Ethereum-On-Raspberry-Pi
   chmod +x /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/install.sh
 
   set_status "[rc.local] - Change the stage to 1"
