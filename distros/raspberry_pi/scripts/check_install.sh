@@ -276,6 +276,34 @@ check_lighthouse_version() {
     fi
 }
 
+# Function to check Nimbus unified client version
+check_nimbus_unified_version() {
+    if command -v nimbus &>/dev/null; then
+        # nimbus --version prints e.g. "Nimbus/v0.3.1-47d76a76/linux-arm64/Nim-2.2.10"
+        nimbus_unified_installed_version=$(nimbus --version 2>&1 | head -n1 | grep -o 'v[0-9]\+\.[0-9]\+\.[0-9]\+' | head -n1 | tr -d "v")
+
+        # /releases/latest returns the "nightly" tag for nimbus-eth1, so pick the newest v* release instead
+        nimbus_unified_latest_version=$(curl -s "https://api.github.com/repos/status-im/nimbus-eth1/releases?per_page=15" | jq -r '[.[] | select(.tag_name | startswith("v"))][0].tag_name' | tr -d "v")
+
+        if [ -z "$nimbus_unified_latest_version" ]; then
+            echolog "ERROR" "Nimbus Unified Version" "Failed to fetch latest version."
+            return
+        fi
+
+        if [ "$nimbus_unified_installed_version" = "$nimbus_unified_latest_version" ]; then
+            echolog "OK" "Nimbus Unified Version" "Installed version $nimbus_unified_installed_version is up to date."
+        else
+            if [ "$(printf '%s\n' "$nimbus_unified_installed_version" "$nimbus_unified_latest_version" | sort -V | head -n1)" = "$nimbus_unified_installed_version" ]; then
+                echolog "WARN" "Nimbus Unified Version" "Installed version $nimbus_unified_installed_version is older than latest version $nimbus_unified_latest_version."
+            else
+                echolog "ERROR" "Nimbus Unified Version" "Installed version $nimbus_unified_installed_version is newer than latest version $nimbus_unified_latest_version."
+            fi
+        fi
+    else
+        echolog "WARN" "Nimbus Unified Version" "Nimbus unified client is not installed."
+    fi
+}
+
 # --- Section: Package Checks ---
 echolog " " " " " "  # Blank line
 echolog "INFO" "Checking Installed Packages..." " "  # Section header
@@ -367,6 +395,8 @@ else
 fi
 
 check_lighthouse_version
+
+check_nimbus_unified_version
 
 # --- Section: Additional Checks ---
 echolog " " " " " "  # Blank line

@@ -1,0 +1,15 @@
+[Unit]
+Description=Web3 Pi Nimbus Unified Client (EL+CL)
+After=network.target
+Documentation=https://setup-guide.web3pi.io
+
+[Service]
+Type=simple
+ExecStart=/home/ethereum/clients/nimbus-unified/nimbus_unified.sh
+Restart=on-failure
+RestartSec=120
+KillSignal=SIGINT
+TimeoutStopSec=900
+
+[Install]
+WantedBy=multi-user.target

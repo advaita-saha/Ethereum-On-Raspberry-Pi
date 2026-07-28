@@ -5,6 +5,8 @@ echo -e "\n--- Latest software versions:"
 echo -n -e "------ geth\t\t= "; curl -s "https://api.github.com/repos/ethereum/go-ethereum/releases/latest" | jq -r '.tag_name' | tr -d "v"
 echo -n -e "------ nimbus\t\t= "; curl -s "https://api.github.com/repos/status-im/nimbus-eth2/releases/latest" | jq -r '.name' | tr -d 'v'
 echo -n -e "------ lighthouse\t= "; curl -s "https://api.github.com/repos/sigp/lighthouse/releases/latest" | jq -r '.tag_name' | tr -d "v"
+# /releases/latest returns the "nightly" tag for nimbus-eth1, so pick the newest v* release instead
+echo -n -e "------ nimbus unified\t= "; curl -s "https://api.github.com/repos/status-im/nimbus-eth1/releases?per_page=15" | jq -r '[.[] | select(.tag_name | startswith("v"))][0].tag_name' | tr -d "v"
 
 
 echo -e "\n--- Installed software versions:"
@@ -17,4 +19,9 @@ nimbus_beacon_node --version
 
 echo -e "\n------ Lighthouse"
 lighthouse --version
+
+if command -v nimbus > /dev/null 2>&1; then
+    echo -e "\n------ Nimbus Unified"
+    nimbus --version
+fi
 echo -e "\n"

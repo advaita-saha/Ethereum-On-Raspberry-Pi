@@ -30,4 +30,7 @@ sudo systemctl stop w3p_lighthouse-beacon.service
 echo "Stop Geth service"
 sudo systemctl stop w3p_geth.service
 
+echo "Stop Nimbus Unified service"
+sudo systemctl stop w3p_nimbus-unified.service
+
 echo "End od script"

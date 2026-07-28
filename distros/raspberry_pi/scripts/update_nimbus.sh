@@ -27,7 +27,9 @@ TMP_NIMBUS_SERVICES="/tmp/stopped_nimbus_services"
 
 # Stop running Nimbus services
 echo -e "\nStopping all running Nimbus services..."
-systemctl list-units --type=service --state=running | grep nimbus | awk '{print $1}' > "$TMP_NIMBUS_SERVICES"
+# Match the beacon service exactly - the Nimbus unified client (w3p_nimbus-unified.service)
+# is a different binary and must not be touched by this apt update
+systemctl list-units --type=service --state=running | grep -F 'w3p_nimbus-beacon.service' | awk '{print $1}' > "$TMP_NIMBUS_SERVICES"
 while IFS= read -r service; do
     echo "Stopping $service..."
     systemctl stop "$service"

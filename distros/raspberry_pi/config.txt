@@ -3,6 +3,8 @@
 geth=true
 nimbus=true
 lighthouse=false
+# Nimbus unified client (EL+CL in one binary) - experimental; replaces geth/nimbus/lighthouse when true
+nimbus_unified=false
 
 # Monitoring
 influxdb=true
@@ -26,6 +28,10 @@ nimbus_port=9000
 
 [lighthouse]
 lighthouse_port=9000
+
+[nimbus-unified]
+nimbus_unified_el_port=30303
+nimbus_unified_cl_port=9000
 
 # End of Web3 Pi config
 

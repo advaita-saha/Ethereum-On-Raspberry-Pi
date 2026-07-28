@@ -502,6 +502,32 @@ if [ "$(get_install_stage)" -eq 2 ]; then
 
   lighthouse --version
 
+  set_status "[install.sh] - Nimbus Unified (EL+CL) Installation"
+  # /releases/latest returns the "nightly" tag for nimbus-eth1, so pick the newest v* release instead
+  NU_RELEASES_URL="https://api.github.com/repos/status-im/nimbus-eth1/releases?per_page=15"
+  NU_BINARIES_URL="$(curl -s $NU_RELEASES_URL | jq -r '[.[] | select(.tag_name | startswith("v"))][0].assets[] | select(.name | test("^nimbus-linux-arm64-.*\\.tar\\.gz$")) | .browser_download_url')"
+
+  echolog Downloading Nimbus Unified URL: $NU_BINARIES_URL
+
+  # Download
+  set_status "[install.sh] - Nimbus Unified Installation - download"
+  wget -O /tmp/nimbus-unified.tar.gz $NU_BINARIES_URL
+  # Untar
+  set_status "[install.sh] - Nimbus Unified Installation - extract"
+  mkdir -p /tmp/nimbus-unified
+  tar -xzvf /tmp/nimbus-unified.tar.gz -C /tmp/nimbus-unified
+
+  set_status "[install.sh] - Nimbus Unified Installation - copy to /usr/bin"
+  # Tarball layout: ./build/nimbus
+  cp /tmp/nimbus-unified/build/nimbus /usr/bin/nimbus
+  chmod +x /usr/bin/nimbus
+
+  # Cleanup
+  set_status "[install.sh] - Nimbus Unified Installation - cleanup"
+  rm -rf /tmp/nimbus-unified /tmp/nimbus-unified.tar.gz
+
+  nimbus --version
+
 ## 6. MISC CONF STEPS ##############################################################################
 
   set_status "[install.sh] - Miscellaneous configuration steps"
@@ -532,6 +558,19 @@ if [ "$(get_install_stage)" -eq 2 ]; then
   lighthouse_port="$(config_get lighthouse_port)";
   # If Lighthouse is not in use, this port can be closed.
   ufw allow ${lighthouse_port}/tcp comment "Lighthouse: p2p"
+
+  # Nimbus unified client ports (keys absent in configs written before this feature)
+  nimbus_unified_el_port="$(config_get nimbus_unified_el_port)";
+  if [ "$nimbus_unified_el_port" != "UNDEFINED" ]; then
+    ufw allow ${nimbus_unified_el_port}/tcp comment "Nimbus Unified: execution layer P2P"
+    ufw allow ${nimbus_unified_el_port}/udp comment "Nimbus Unified: execution layer P2P"
+  fi
+  nimbus_unified_cl_port="$(config_get nimbus_unified_cl_port)";
+  if [ "$nimbus_unified_cl_port" != "UNDEFINED" ]; then
+    ufw allow ${nimbus_unified_cl_port}/tcp comment "Nimbus Unified: consensus layer P2P"
+    ufw allow ${nimbus_unified_cl_port}/udp comment "Nimbus Unified: consensus layer P2P"
+  fi
+
   ufw allow 3000/tcp comment "Grafana: web interface"
 
   # If the database and cgrafana are on the same device, this port does not need to be open in the firewall, as communication occurs over localhost.
@@ -614,6 +653,7 @@ if [ "$(get_install_stage)" -eq 2 ]; then
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/geth/w3p_geth.service /etc/systemd/system/w3p_geth.service
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/lighthouse/w3p_lighthouse-beacon.service /etc/systemd/system/w3p_lighthouse-beacon.service
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/nimbus/w3p_nimbus-beacon.service /etc/systemd/system/w3p_nimbus-beacon.service
+  cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/nimbus-unified/w3p_nimbus-unified.service /etc/systemd/system/w3p_nimbus-unified.service
 
 
 ## 9. CLIENTS CONFIGURATION ############################################################################
@@ -626,13 +666,16 @@ if [ "$(get_install_stage)" -eq 2 ]; then
   mkdir /home/ethereum/clients/geth
   mkdir /home/ethereum/clients/lighthouse
   mkdir /home/ethereum/clients/nimbus
-  
+  mkdir /home/ethereum/clients/nimbus-unified
+
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/geth/geth.sh /home/ethereum/clients/geth/geth.sh
   chmod +x /home/ethereum/clients/geth/geth.sh
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/lighthouse/lighthouse.sh /home/ethereum/clients/lighthouse/lighthouse.sh
   chmod +x /home/ethereum/clients/lighthouse/lighthouse.sh
   cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/nimbus/nimbus.sh /home/ethereum/clients/nimbus/nimbus.sh
   chmod +x /home/ethereum/clients/nimbus/nimbus.sh
+  cp /opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/nimbus-unified/nimbus_unified.sh /home/ethereum/clients/nimbus-unified/nimbus_unified.sh
+  chmod +x /home/ethereum/clients/nimbus-unified/nimbus_unified.sh
 
   set_status "[install.sh] - basic-system-monitor, basic-eth2-node-monitor, w3p-lcd-dashboardInstall"
   apt install -y w3p-system-monitor w3p-node-monitor w3p-lcd-dashboard
@@ -797,7 +840,22 @@ if [ "$(get_install_stage)" -eq 2 ]; then
   else
     echolog "Service config: NoChange w3p_nimbus-beacon.service"
   fi
-  
+
+  # The unified client replaces both the execution and consensus clients, so it
+  # is checked last and disables all of them when enabled.
+  if [ "$(config_get nimbus_unified)" = "true" ]; then
+    echolog "Service config: Enable w3p_nimbus-unified.service (disables geth/nimbus/lighthouse)"
+    systemctl disable w3p_geth.service
+    systemctl disable w3p_nimbus-beacon.service
+    systemctl disable w3p_lighthouse-beacon.service
+    systemctl enable w3p_nimbus-unified.service
+  elif  [ "$(config_get nimbus_unified)" = "false" ]; then
+    echolog "Service config: Disable w3p_nimbus-unified.service"
+    systemctl disable w3p_nimbus-unified.service
+  else
+    echolog "Service config: NoChange w3p_nimbus-unified.service"
+  fi
+
 
 
   # Next line creates an empty file so it won't run the next boot
@@ -923,6 +981,27 @@ if [ "$(get_install_stage)" -eq 100 ]; then
     systemctl disable w3p_nimbus-beacon.service
   else
     echolog "Service config: NoChange w3p_nimbus-beacon.service"
+  fi
+
+  # The unified client replaces both the execution and consensus clients, so it
+  # is checked last and stops/disables all of them when enabled.
+  if [ "$(config_get nimbus_unified)" = "true" ]; then
+    echolog "Service config: Enable w3p_nimbus-unified.service (disables geth/nimbus/lighthouse)"
+    systemctl stop w3p_geth.service
+    systemctl disable w3p_geth.service
+    systemctl stop w3p_nimbus-beacon.service
+    systemctl disable w3p_nimbus-beacon.service
+    systemctl stop w3p_lighthouse-beacon.service
+    systemctl disable w3p_lighthouse-beacon.service
+
+    systemctl enable w3p_nimbus-unified.service
+    systemctl start w3p_nimbus-unified.service
+  elif  [ "$(config_get nimbus_unified)" = "false" ]; then
+    echolog "Service config: Disable w3p_nimbus-unified.service"
+    systemctl stop w3p_nimbus-unified.service
+    systemctl disable w3p_nimbus-unified.service
+  else
+    echolog "Service config: NoChange w3p_nimbus-unified.service"
   fi
 
   set_status "[install.sh] - Start and Enable unattended-upgrades.service"
