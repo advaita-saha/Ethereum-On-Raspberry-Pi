@@ -177,8 +177,9 @@ if [ "$success" = true ]; then
   # Execution and consensus run in one process; the Engine API stays internal
   # (localhost, auto-generated JWT), so no exec_url/jwt-secret wiring is needed.
   # Note: --rpc-api only accepts eth/debug/admin, but net_* and web3_* methods
-  # are always served.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  # are always served. WS is required by the node monitor (w3p_bnm) and shares
+  # the HTTP server port (8545) - unlike geth there is no separate WS port.
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
