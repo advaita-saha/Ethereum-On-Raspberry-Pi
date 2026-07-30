@@ -179,7 +179,14 @@ if [ "$success" = true ]; then
   # Note: --rpc-api only accepts eth/debug/admin, but net_* and web3_* methods
   # are always served. WS is required by the node monitor (w3p_bnm) and shares
   # the HTTP server port (8545) - unlike geth there is no separate WS port.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  #
+  # The --debug-* options are hidden execution-layer tuning flags (verified
+  # against v0.4.0; names may change in future releases):
+  #  - dynamic persist batch size and parallel state root computation
+  #  - reduced DB cache sizes for the Pi's limited RAM: block cache
+  #    2GiB->512MiB, key cache 1280MiB->512MiB, branch cache 1GiB->512MiB,
+  #    vtx cache 512MiB->256MiB (~4.8GiB -> ~1.8GiB total cache budget)
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update --debug-dynamic-batch-size=true --debug-parallel-state-root=true --debug-rocksdb-block-cache-size=536870912 --debug-rdb-key-cache-size=536870912 --debug-rdb-branch-cache-size=536870912 --debug-rdb-vtx-cache-size=268435456 ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
