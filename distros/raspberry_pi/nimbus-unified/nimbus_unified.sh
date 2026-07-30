@@ -182,13 +182,15 @@ if [ "$success" = true ]; then
   #
   # The --debug-* options are hidden execution-layer tuning flags (verified
   # against v0.4.0; names may change in future releases):
-  #  - dynamic persist batch size and parallel state root computation
+  #  - dynamic persist batch size, parallel state root computation and
+  #    optimistic state prefetch (pre-executes block transactions on
+  #    background threads to warm the DB caches)
   #  - DB caches trimmed to 80% of their defaults for the Pi's limited RAM:
   #    block cache 2048->1638MiB, key cache 1280->1024MiB, branch cache
   #    1024->819MiB, vtx cache 512->410MiB (~4.8GiB -> ~3.8GiB budget).
   #    Cutting these further starves the caches and the extra disk reads make
   #    the device unresponsive, so keep the reduction modest.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update --debug-dynamic-batch-size=true --debug-parallel-state-root=true --debug-rocksdb-block-cache-size=1717567488 --debug-rdb-key-cache-size=1073741824 --debug-rdb-branch-cache-size=858783744 --debug-rdb-vtx-cache-size=429916160 ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update --debug-dynamic-batch-size=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true --debug-rocksdb-block-cache-size=1717567488 --debug-rdb-key-cache-size=1073741824 --debug-rdb-branch-cache-size=858783744 --debug-rdb-vtx-cache-size=429916160 ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
