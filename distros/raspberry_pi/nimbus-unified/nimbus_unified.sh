@@ -305,7 +305,10 @@ if [ "$success" = true ]; then
   #
   # The DB caches (rocksdb block cache, rdb key/branch/vtx caches) are left at
   # their defaults - overriding them was never shown to help on the Pi.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update --debug-dynamic-batch-size=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  #
+  # --prune enables background pruning of expired block bodies and receipts,
+  # keeping the database from growing without bound on the Pi's storage.
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --enr-auto-update --prune=true --debug-dynamic-batch-size=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
