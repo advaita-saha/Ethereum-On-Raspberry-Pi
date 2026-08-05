@@ -255,6 +255,11 @@ else
         break
       else
         echolog "Sync failed with server: $server, trying next server..."
+        # Without this the reason for the failure is lost - the output is
+        # captured to test it for the success message, so it never reaches
+        # the journal on its own.
+        echolog "Last 30 lines of trustedNodeSync output:"
+        echo "$output" | tail -n 30 | echolog
         # Only the beacon database is discarded - the execution database
         # (ecdb) was just downloaded and must survive.
         echolog "Removing $nu_dir/db "
