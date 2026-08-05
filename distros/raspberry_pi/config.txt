@@ -32,6 +32,9 @@ lighthouse_port=9000
 [nimbus-unified]
 nimbus_unified_el_port=30303
 nimbus_unified_cl_port=9000
+# Address that receives execution layer tips from blocks this node proposes.
+# Only needed when running validators; uncomment and set your own address.
+#nimbus_unified_fee_recipient=0x0000000000000000000000000000000000000000
 
 # End of Web3 Pi config
 

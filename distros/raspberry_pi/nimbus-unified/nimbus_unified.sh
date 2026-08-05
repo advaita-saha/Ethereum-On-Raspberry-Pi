@@ -61,6 +61,7 @@ echolog "Nimbus unified client run script (nimbus_unified.sh)"
 
 nimbus_unified_el_port="$(config_get nimbus_unified_el_port)";
 nimbus_unified_cl_port="$(config_get nimbus_unified_cl_port)";
+nimbus_unified_fee_recipient="$(config_get nimbus_unified_fee_recipient)";
 eth_network="$(config_get eth_network)";
 
 # Default ports when not present in config.txt
@@ -69,6 +70,12 @@ if [ "${nimbus_unified_el_port}" = "UNDEFINED" ]; then
 fi
 if [ "${nimbus_unified_cl_port}" = "UNDEFINED" ]; then
   nimbus_unified_cl_port=9000
+fi
+
+# Only meaningful when validators are attached, so there is no default - the
+# flag is left off entirely unless an address is configured.
+if [ "${nimbus_unified_fee_recipient}" = "UNDEFINED" ]; then
+  nimbus_unified_fee_recipient=""
 fi
 
 # Checking internet connection
@@ -95,6 +102,7 @@ echolog "$(date): Connected - ${pingServerAdr}"
 echolog "nimbus_unified_el_port = ${nimbus_unified_el_port}"
 echolog "nimbus_unified_cl_port = ${nimbus_unified_cl_port}"
 echolog "eth_network = ${eth_network}"
+echolog "nimbus_unified_fee_recipient = ${nimbus_unified_fee_recipient:-<not set>}"
 echolog "nu_dir = ${nu_dir}"
 
 success=false
@@ -317,7 +325,7 @@ if [ "$success" = true ]; then
   # unified mode disables the per-thread metrics servers and runs a single
   # combined one, so there is no port conflict between EL and CL. It listens on
   # localhost only, which is where anything on this device would scrape it.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --metrics=true --metrics-port=8008 --enr-auto-update --prune=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --metrics=true --metrics-port=8008 --enr-auto-update --prune=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${nimbus_unified_fee_recipient:+--suggested-fee-recipient="$nimbus_unified_fee_recipient"} ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
