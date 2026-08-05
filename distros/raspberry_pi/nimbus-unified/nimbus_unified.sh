@@ -112,20 +112,66 @@ else
   # where nimbus keeps its execution database under the data dir.
   el_db_url="https://eth1-db.nimbus.team/${eth_network}-latest.tar.gz"
 
+  # Logs the unpacked size once a minute. curl's own progress meter is
+  # carriage-return based and journald renders it as unreadable "blob data",
+  # so it is switched off and the growing ecdb directory is measured instead.
+  # The archive is mostly already-compressed sst files, so its download size is
+  # a close enough stand-in for the unpacked total to give a percentage.
+  el_db_progress() {
+    local prev=0 prev_t cur now
+    prev_t="$(date +%s)"
+    while sleep 60; do
+      cur="$(du -sb "${nu_dir}/ecdb" 2>/dev/null | cut -f1)"
+      now="$(date +%s)"
+      [ -z "$cur" ] && cur=0
+      echolog "$(awk -v cur="$cur" -v prev="$prev" -v dt="$((now - prev_t))" -v total="$el_db_size" 'BEGIN {
+        gib = 1024 * 1024 * 1024
+        rate = (dt > 0) ? (cur - prev) / dt : 0
+        line = sprintf("Snapshot progress: %.1f GiB", cur / gib)
+        if (total > 0)
+          line = line sprintf(" of ~%.1f GiB (%d%%)", total / gib, (cur * 100) / total)
+        line = line sprintf(" - %.1f MiB/s", rate / (1024 * 1024))
+        if (rate > 0 && total > cur)
+          line = line sprintf(" - ETA %dh%02dm", (total - cur) / rate / 3600, ((total - cur) / rate % 3600) / 60)
+        print line
+      }')"
+      prev="$cur"
+      prev_t="$now"
+    done
+  }
+
   if [ -d "${nu_dir}/ecdb" ]; then
     echolog "Execution database already present in ${nu_dir}/ecdb - skipping snapshot download"
   else
     echolog "Downloading execution database snapshot: ${el_db_url}"
-    echolog "This is a large download (tens of GB) and can take several hours"
+
+    el_db_size="$(curl -fsIL --max-time 60 "$el_db_url" | grep -i '^content-length:' | tail -n 1 | tr -dc '0-9')"
+    [ -z "$el_db_size" ] && el_db_size=0
+    if [ "$el_db_size" -gt 0 ]; then
+      echolog "$(awk -v s="$el_db_size" 'BEGIN { printf "Snapshot size: %.1f GiB - this can take several hours", s / (1024 * 1024 * 1024) }')"
+    else
+      echolog "Snapshot size unknown - this can take several hours"
+    fi
     df -h /mnt/storage | echolog
 
     mkdir -p "$nu_dir"
 
+    # The progress helper runs in the background so the transfer itself stays in
+    # the foreground and PIPESTATUS still reports curl and tar.
+    el_db_progress &
+    el_db_progress_pid=$!
+
     # The server does not honour range requests, so a broken transfer cannot be
     # resumed anyway - stream straight into tar rather than staging the archive
     # on disk, which would otherwise need close to twice the space.
-    curl -fL --retry 3 --retry-delay 30 "$el_db_url" | tar -xzf - -C "$nu_dir"
+    # --no-same-owner: the archive is packed on a Mac and carries its uids,
+    # which root would otherwise restore onto the database files.
+    curl -fL --retry 3 --retry-delay 30 --no-progress-meter "$el_db_url" \
+      | tar -xzf - --no-same-owner -C "$nu_dir"
     el_db_status=("${PIPESTATUS[@]}")
+
+    kill "$el_db_progress_pid" 2>/dev/null
+    wait "$el_db_progress_pid" 2>/dev/null
 
     if [ "${el_db_status[0]}" -eq 0 ] && [ "${el_db_status[1]}" -eq 0 ]; then
       echolog "Execution database snapshot unpacked into ${nu_dir}/ecdb"
