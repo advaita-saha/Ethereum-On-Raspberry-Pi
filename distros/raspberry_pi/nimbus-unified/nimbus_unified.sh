@@ -164,11 +164,34 @@ else
     # The server does not honour range requests, so a broken transfer cannot be
     # resumed anyway - stream straight into tar rather than staging the archive
     # on disk, which would otherwise need close to twice the space.
+    #
+    # --speed-limit/--speed-time abort a connection that has silently gone dead
+    # (curl will otherwise wait on it forever). Retrying is done out here rather
+    # than with curl's own --retry: without resume that restarts the body from
+    # byte 0, which would splice a second archive into the middle of tar's input
+    # stream, so every attempt needs a clean ecdb to extract into.
+    #
     # --no-same-owner: the archive is packed on a Mac and carries its uids,
     # which root would otherwise restore onto the database files.
-    curl -fL --retry 3 --retry-delay 30 --no-progress-meter "$el_db_url" \
-      | tar -xzf - --no-same-owner -C "$nu_dir"
-    el_db_status=("${PIPESTATUS[@]}")
+    el_db_attempt=1
+    el_db_max_attempts=3
+    while true; do
+      curl -fL --speed-limit 102400 --speed-time 120 --no-progress-meter "$el_db_url" \
+        | tar -xzf - --no-same-owner -C "$nu_dir"
+      el_db_status=("${PIPESTATUS[@]}")
+
+      if [ "${el_db_status[0]}" -eq 0 ] && [ "${el_db_status[1]}" -eq 0 ]; then
+        break
+      fi
+      if [ "$el_db_attempt" -ge "$el_db_max_attempts" ]; then
+        break
+      fi
+
+      echolog "Snapshot attempt ${el_db_attempt}/${el_db_max_attempts} failed (curl=${el_db_status[0]} tar=${el_db_status[1]}) - restarting the download"
+      rm -rf "${nu_dir}/ecdb"
+      el_db_attempt=$((el_db_attempt + 1))
+      sleep 30
+    done
 
     kill "$el_db_progress_pid" 2>/dev/null
     wait "$el_db_progress_pid" 2>/dev/null
