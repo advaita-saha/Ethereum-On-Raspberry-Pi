@@ -108,20 +108,25 @@ else
   # Pre-seeded execution layer database published by the Nimbus team. Restoring
   # it is far quicker than letting the execution layer sync from scratch on a
   # Pi. Snapshots exist for mainnet and hoodi only - other networks just fall
-  # through and sync normally. The archive unpacks to "ecdb/", which is exactly
-  # where nimbus keeps its execution database under the data dir.
+  # through and sync normally.
+  #
+  # The archives are not laid out consistently - mainnet packs "ecdb/" at the
+  # top level while hoodi wraps it in "hoodi-latest/ecdb/" - so extraction goes
+  # to a staging directory and the ecdb is located and moved into place after.
+  # Staging lives inside the data dir so the move is a same-filesystem rename.
   el_db_url="https://eth1-db.nimbus.team/${eth_network}-latest.tar.gz"
+  el_db_tmp="${nu_dir}/.snapshot-download"
 
   # Logs the unpacked size once a minute. curl's own progress meter is
   # carriage-return based and journald renders it as unreadable "blob data",
-  # so it is switched off and the growing ecdb directory is measured instead.
+  # so it is switched off and the growing staging directory is measured instead.
   # The archive is mostly already-compressed sst files, so its download size is
   # a close enough stand-in for the unpacked total to give a percentage.
   el_db_progress() {
     local prev=0 prev_t cur now
     prev_t="$(date +%s)"
     while sleep 60; do
-      cur="$(du -sb "${nu_dir}/ecdb" 2>/dev/null | cut -f1)"
+      cur="$(du -sb "${el_db_tmp}" 2>/dev/null | cut -f1)"
       now="$(date +%s)"
       [ -z "$cur" ] && cur=0
       echolog "$(awk -v cur="$cur" -v prev="$prev" -v dt="$((now - prev_t))" -v total="$el_db_size" 'BEGIN {
@@ -169,29 +174,40 @@ else
     # (curl will otherwise wait on it forever). Retrying is done out here rather
     # than with curl's own --retry: without resume that restarts the body from
     # byte 0, which would splice a second archive into the middle of tar's input
-    # stream, so every attempt needs a clean ecdb to extract into.
+    # stream, so every attempt needs to extract into an empty staging directory.
     #
     # --no-same-owner: the archive is packed on a Mac and carries its uids,
     # which root would otherwise restore onto the database files.
     el_db_attempt=1
     el_db_max_attempts=3
     while true; do
+      rm -rf "$el_db_tmp"
+      mkdir -p "$el_db_tmp"
+
       curl -fL --speed-limit 102400 --speed-time 120 --no-progress-meter "$el_db_url" \
-        | tar -xzf - --no-same-owner -C "$nu_dir"
+        | tar -xzf - --no-same-owner -C "$el_db_tmp"
       el_db_status=("${PIPESTATUS[@]}")
 
       if [ "${el_db_status[0]}" -eq 0 ] && [ "${el_db_status[1]}" -eq 0 ]; then
-        break
+        el_db_src="$(find "$el_db_tmp" -mindepth 1 -maxdepth 2 -type d -name ecdb | head -n 1)"
+        if [ -n "$el_db_src" ]; then
+          mv "$el_db_src" "${nu_dir}/ecdb"
+          break
+        fi
+        echolog "No ecdb directory found in the extracted snapshot - unexpected archive layout"
+        el_db_status=(0 1)
       fi
+
       if [ "$el_db_attempt" -ge "$el_db_max_attempts" ]; then
         break
       fi
 
       echolog "Snapshot attempt ${el_db_attempt}/${el_db_max_attempts} failed (curl=${el_db_status[0]} tar=${el_db_status[1]}) - restarting the download"
-      rm -rf "${nu_dir}/ecdb"
       el_db_attempt=$((el_db_attempt + 1))
       sleep 30
     done
+
+    rm -rf "$el_db_tmp"
 
     kill "$el_db_progress_pid" 2>/dev/null
     wait "$el_db_progress_pid" 2>/dev/null
