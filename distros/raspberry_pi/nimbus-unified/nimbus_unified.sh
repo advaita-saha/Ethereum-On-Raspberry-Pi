@@ -105,6 +105,36 @@ if [ -d "${nu_dir}/db" ]; then
   echolog "Existing database found in ${nu_dir} - skipping checkpoint sync"
   success=true
 else
+  # Pre-seeded execution layer database published by the Nimbus team. Restoring
+  # it is far quicker than letting the execution layer sync from scratch on a
+  # Pi. Snapshots exist for mainnet and hoodi only - other networks just fall
+  # through and sync normally. The archive unpacks to "ecdb/", which is exactly
+  # where nimbus keeps its execution database under the data dir.
+  el_db_url="https://eth1-db.nimbus.team/${eth_network}-latest.tar.gz"
+
+  if [ -d "${nu_dir}/ecdb" ]; then
+    echolog "Execution database already present in ${nu_dir}/ecdb - skipping snapshot download"
+  else
+    echolog "Downloading execution database snapshot: ${el_db_url}"
+    echolog "This is a large download (tens of GB) and can take several hours"
+    df -h /mnt/storage | echolog
+
+    mkdir -p "$nu_dir"
+
+    # The server does not honour range requests, so a broken transfer cannot be
+    # resumed anyway - stream straight into tar rather than staging the archive
+    # on disk, which would otherwise need close to twice the space.
+    curl -fL --retry 3 --retry-delay 30 "$el_db_url" | tar -xzf - -C "$nu_dir"
+    el_db_status=("${PIPESTATUS[@]}")
+
+    if [ "${el_db_status[0]}" -eq 0 ] && [ "${el_db_status[1]}" -eq 0 ]; then
+      echolog "Execution database snapshot unpacked into ${nu_dir}/ecdb"
+    else
+      echolog "Snapshot download failed (curl=${el_db_status[0]} tar=${el_db_status[1]}) - the execution layer will sync from scratch"
+      rm -rf "${nu_dir}/ecdb"
+    fi
+  fi
+
   # File with the list of servers
   SERVERS_FILE="/opt/web3pi/Ethereum-On-Raspberry-Pi/distros/raspberry_pi/scripts/servers_list_${eth_network}.txt"
 
@@ -140,8 +170,10 @@ else
         break
       else
         echolog "Sync failed with server: $server, trying next server..."
-        echolog "Removing $nu_dir "
-        rm -r $nu_dir
+        # Only the beacon database is discarded - the execution database
+        # (ecdb) was just downloaded and must survive.
+        echolog "Removing $nu_dir/db "
+        rm -rf "$nu_dir/db"
       fi
     fi
   done < "$SERVERS_FILE"
