@@ -570,6 +570,9 @@ if [ "$(get_install_stage)" -eq 2 ]; then
     ufw allow ${nimbus_unified_cl_port}/tcp comment "Nimbus Unified: consensus layer P2P"
     ufw allow ${nimbus_unified_cl_port}/udp comment "Nimbus Unified: consensus layer P2P"
   fi
+  # Prometheus metrics endpoint - bound to 0.0.0.0 by the run script so it can
+  # be scraped from another machine on the LAN
+  ufw allow 8008/tcp comment "Nimbus Unified: Prometheus metrics"
 
   ufw allow 3000/tcp comment "Grafana: web interface"
 
