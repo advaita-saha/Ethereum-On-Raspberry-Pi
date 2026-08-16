@@ -321,12 +321,16 @@ if [ "$success" = true ]; then
   # --prune enables background pruning of expired block bodies and receipts,
   # keeping the database from growing without bound on the Pi's storage.
   #
+  # --graffiti tags blocks proposed by this node. Unlike the fee recipient it
+  # carries no value, so it is fixed rather than configurable - it identifies
+  # the setup, not the operator. The field holds 32 bytes; this is 21.
+  #
   # --metrics serves Prometheus metrics for both layers on one endpoint:
   # unified mode disables the per-thread metrics servers and runs a single
   # combined one, so there is no port conflict between EL and CL. It binds to
   # 0.0.0.0 rather than the default localhost so an off-device Prometheus can
   # scrape it; the firewall rule for 8008 is what gates access.
-  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --metrics=true --metrics-port=8008 --metrics-address=0.0.0.0 --enr-auto-update --prune=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${nimbus_unified_fee_recipient:+--suggested-fee-recipient="$nimbus_unified_fee_recipient"} ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
+  nimbus --non-interactive --network=${eth_network} --data-dir=${nu_dir} --execution-tcp-port=${nimbus_unified_el_port} --execution-udp-port=${nimbus_unified_el_port} --beacon-tcp-port=${nimbus_unified_cl_port} --beacon-udp-port=${nimbus_unified_cl_port} --rpc=true --rpc-api=eth --ws=true --ws-api=eth --http-port=8545 --http-address=0.0.0.0 --rest=true --rest-port=5052 --rest-address=0.0.0.0 --rest-allow-origin='*' --graffiti="web3pi-nimbus-unified" --metrics=true --metrics-port=8008 --metrics-address=0.0.0.0 --enr-auto-update --prune=true --debug-parallel-state-root=true --debug-optimistic-state-prefetch=true ${nimbus_unified_fee_recipient:+--suggested-fee-recipient="$nimbus_unified_fee_recipient"} ${state_finalized:+--finalized-checkpoint-state="$nu_dir/state.finalized.ssz"}
 else
   # If no server was successful
   echolog "All sync attempts failed. Nimbus unified client will not be started."
